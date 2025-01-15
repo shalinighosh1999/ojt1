@@ -1,60 +1,111 @@
+// 3rd-party module
+const jwt = require("jsonwebtoken");
+
+// import controller
+var AdminController = require("../controllers/admin.controller");
+var UserController = require("../controllers/user.controller");
 
 var user = {};
 
-// var AdminController = require('../controllers/auth/admin');
-// var UserController = require('../controllers/auth/user')
+// Middleware
+const permission = [
+  // Admin
+  {
+    url: "/admin/admin-registration",
+  },
+  {
+    url: "/admin/admin-login",
+  },
 
+  // User
+  {
+    url: "/user/user-registration",
+  },
+  {
+    url: "/user/user-login",
+  },
+];
 
+// JWT secret keys for different roles
+const JWT_SECRETS = {
+  Admin: process.env.JWT_SECRET_KEY_ADMIN,
+  User: process.env.JWT_SECRET_KEY_USER,
+};
 
-//Middleware
-const parmisoen = [
-    
-    {
-        url: "/admin/login",
-    },
-    {
-        url: "/admin/register",
-    },
-    
-
-]
+// Verify JWT token
+const verifyToken = (token, userType) => {
+  try {
+    return jwt.verify(token, JWT_SECRETS[userType]);
+  } catch (error) {
+    return error;
+  }
+};
 
 user.middleware = async (req, res, next) => {
-    if (parmisoen.filter(it => it.url == req.url).length > 0) {
-        next();
-    } else {
-        if (!req.headers.authorization) {
-            return res.status(200).json({ error: "No credentials sent!", status: false, credentials: false });
-        } 
-        else {
-            let authorization = req.headers.authorization
-            //console.log(authorization);
-            let userData = null;
-            let userType = typeof(req.headers.usertype) != "undefined" ? req.headers.usertype : "User";
-            // console.log('userType', userType, req.headers);
-            if (userType == "Admin") {
-                userData = await AdminController.getTokenData(authorization);
-             }
-            else if(userType == "User") {
-                userData = await UserController.getTokenData(authorization);
-            }
-//console.log(userData);
-            if (userData && userData != null) {
-                    userData.password = null;
-                    userData.token = null;
-                    req.user = userData;
-                    req.userType= userType;
-                    req.token = req.headers.authorization,
-                    next();
-            } else {
-                res.status(200).json({ error: "credentials not match", status: false, credentials: false });
-            }
+  // Check if the route is public
+  if (permission.filter((it) => it.url == req.url).length > 0) {
+    return next();
+  }
 
-        }
+  // Check for authorization header
+  if (!req.headers.authorization) {
+    return res.status(200).json({
+      error: "No credentials sent!",
+      status: false,
+      credentials: false,
+    });
+  }
+
+  const authorization = req.headers.authorization;
+  let userData;
+
+  // Determine user type from headers, default to "User"
+  const userType = req.headers.usertype || "User";
+
+  // Verify JWT token first
+  const decodedToken = verifyToken(authorization, userType);
+  if (!decodedToken) {
+    return res.status(200).json({
+      error: "Invalid token",
+      status: false,
+      credentials: false,
+    });
+  }
+
+  // Get user data based on role
+  try {
+    if (userType === "Admin") {
+      userData = await AdminController.getTokenData(authorization);
+    } else if (userType === "User") {
+      userData = await UserController.getTokenData(authorization);
     }
 
-}
+    // If user data exists and is valid
+    if (userData && userData != null) {
+      userData.password = null;
+      userData.token = null;
 
+      // Attach user data to request object
+      req.user = userData;
+      req.userType = userType;
+      req.token = authorization;
 
+      return next();
+    }
+
+    // If no valid user data found
+    return res.status(200).json({
+      status: false,
+      credentials: false,
+      message: "A token is required for authentication",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: "Authentication error",
+      status: false,
+      credentials: false,
+    });
+  }
+};
 
 module.exports = user;

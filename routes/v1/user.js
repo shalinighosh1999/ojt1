@@ -1,14 +1,103 @@
-var express = require('express');
+// user related route are comming here
+
+var express = require("express");
 var router = express.Router();
 const multer = require("multer");
 const path = require("path");
-var storage = multer.memoryStorage()
+var storage = multer.memoryStorage();
 var upload = multer({ storage: storage });
 
+// import controller
+const userController = require("../../controllers/user.controller");
+const adminController = require("../../controllers/admin.controller");
+const ProductController = require("../../controllers/product.controller");
+const LikeController = require("../../controllers/like.controller");
+const CommentController = require("../../controllers/comment.controller");
+const ProductRatingController = require("../../controllers/rating.controller");
 
+// import others
+const {
+  userRegisterValidator,
+  loginValidator,
+  passwordValidator,
+} = require("../../helper/validation");
 
+// ************************************** Auth route ************************************
+// Define user registration route
+router.post(
+  "/user-registration",
+  userRegisterValidator,
+  userController.userRegistration
+);
 
+// Define user login route
+router.post("/user-login", loginValidator, userController.userLogin);
+
+// Define user update password route
+router.post(
+  "/update-password",
+  passwordValidator,
+  userController.updatePassword
+);
+
+// Define get user profile route
+router.get("/get-profile", userController.getProfile);
+
+// *************************************************** product route *******************************
+
+// Define create product route
+router.post("/create-product", ProductController.createProduct);
+
+// Define get product route
+router.get("/get-product", ProductController.getProduct);
+
+// Define get product category route
+router.get("/get-category", adminController.getProductCategory);
+
+// Define get product sub-category route
+router.get("/get-subcategory", adminController.getProductCategory);
+
+// Define get category wise sub-categorywise product route
+router.post(
+  "/get-category-subcategory-product",
+  ProductController.getcategorySubcategoryProduct
+);
+
+// Define product search route
+router.get("/product-search", ProductController.searchProduct);
+
+// ******************************************* Like route ********************************
+// Define create like route
+router.post("/create-like", LikeController.toggleLike);
+
+// Define like status route
+router.get("/like-status/:productId", LikeController.likeStatus);
+
+// Define user's liked product route
+router.get("/user-like-product", LikeController.getUserLikedProducts);
+
+// ************************************* Comment route ***************************************
+
+// Define create comment route
+router.post("/create-comment", CommentController.createComment);
+
+// Define update comment route
+router.put("/update-comment/:commentId", CommentController.upateComment);
+
+// Define delete comment route
+router.delete("/delete-comment/:commentId", CommentController.deleteCommnet);
+
+// Get comment for a product
+router.get(
+  "/products/:productId/comments",
+  CommentController.getProductComment
+);
+
+// *********************************** product rating *******************************
+// Define create create route
+router.post("/create-rating", ProductRatingController.createRating);
+
+// Define get user rating route
+router.get("/get-rating", ProductRatingController.getRating);
 
 module.exports = router;
-
-

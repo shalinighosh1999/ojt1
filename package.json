@@ -15,7 +15,7 @@
     "debug": "~2.6.9",
     "dotenv": "^16.4.5",
     "express": "~4.16.1",
-    "express-validator": "^7.0.1",
+    "express-validator": "^7.2.1",
     "http-errors": "~1.6.3",
     "id-auto-increment": "^1.0.1",
     "jade": "~1.11.0",
