@@ -58,7 +58,7 @@ const createRating = async (req, res) => {
       allProductRatings.length;
 
     // Update product with new average rating
-    await ProductModel.findByIdAndUpdate(productId, {
+    await ProductRatingModel.findByIdAndUpdate(newRating._id, {
       averageRating: parseFloat(averageRating.toFixed(1)),
       totalRatings: allProductRatings.length,
     });
@@ -102,4 +102,112 @@ const getRating = async (req, res) => {
   }
 };
 
-module.exports = { createRating, getRating };
+// Get single product rating controller mehtod
+const getSingleProductRating = async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    const productRating = await ProductRatingModel.find({ productId });
+
+    if (productRating) {
+      return res.status(200).json({
+        status: 200,
+        message: "Data fetch successfully",
+        data: productRating,
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      message: "Internal Server error",
+    });
+  }
+};
+
+// Update product rating controller mehtod
+const updateProductRating = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { rating, title, review } = req.body;
+    const userId = req.user._id;
+
+    const existingRating = await ProductRatingModel.findOne({
+      userId,
+      productId,
+    });
+    existingRating.rating = rating;
+    existingRating.title = title;
+    existingRating.review = review;
+
+    // Upate the rating
+    await existingRating.save();
+
+    // Recalculate average rating for the product
+    const allProductRatings = await ProductRatingModel.find({ productId });
+    const totalRatings = allProductRatings.length;
+    const averageRating =
+      allProductRatings.reduce((acc, curr) => acc + curr.rating, 0) /
+      totalRatings;
+
+    // Update all ratings documents for this product with new averages
+    await ProductRatingModel.updateMany(
+      { productId },
+      {
+        $set: {
+          averageRating: Number(averageRating.toFixed(1)),
+          totalRatings,
+        },
+      }
+    );
+
+    // Fetch updated rating to return
+    const updatedRating = await ProductRatingModel.findOne({
+      userId,
+      productId,
+    });
+
+    if (updatedRating) {
+      return res.status(200).json({
+        status: 200,
+        message: "Rating update successfully",
+        data: updatedRating,
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+    });
+  }
+};
+
+// Define delete product rating controller mehtod
+const deleteProductRating = async (req, res) => {
+  try {
+    const { ratingId } = req.params;
+
+    const deletedRating = await ProductRatingModel.findByIdAndUpdate(ratingId, {
+      isDeleted: true,
+    });
+
+    if (deletedRating) {
+      return res.status(200).json({
+        status: 200,
+        message: "Rating deleted successfully",
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+    });
+  }
+};
+
+module.exports = {
+  createRating,
+  getRating,
+  getSingleProductRating,
+  updateProductRating,
+  deleteProductRating,
+};

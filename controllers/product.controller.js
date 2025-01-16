@@ -1,3 +1,6 @@
+// 3rd-party module
+const mongoose = require("mongoose");
+
 // import model
 const ProductCategoryModel = require("../Models/product/category.model");
 const ProductSubcategoryModel = require("../Models/product/subCategory.model");
@@ -87,7 +90,57 @@ const createProduct = async (req, res) => {
 // Define get product controller method
 const getProduct = async (req, res) => {
   try {
-    const getProduct = await productModel.find({});
+    // const getProduct = await productModel.find({});
+    const getProduct = await productModel.aggregate([
+      {
+        $match: {},
+      },
+      // Get likes information
+      {
+        $lookup: {
+          from: "likes",
+          localField: "_id",
+          foreignField: "productId",
+          pipeline: [{ $match: { isLiked: true } }],
+          as: "likes",
+        },
+      },
+
+      // get rating information
+      {
+        $lookup: {
+          from: "ratings",
+          localField: "_id",
+          foreignField: "productId",
+          pipeline: [
+            { $match: { isDeleted: false } },
+            {
+              $group: {
+                _id: null,
+                averageRating: { $avg: "$rating" },
+                totalRatings: { $sum: 1 },
+              },
+            },
+          ],
+          as: "ratings",
+        },
+      },
+      {
+        $addFields: {
+          totalLikes: { $size: "$likes" },
+          rating: {
+            average: { $round: [{ $first: "$ratings.averageRating" }, 1] },
+            count: { $first: "$ratings.totalRatings" },
+          },
+        },
+      },
+      {
+        $project: {
+          likes: 0,
+          ratings: 0,
+        },
+      },
+    ]);
 
     return res.status(200).json({
       status: 200,
@@ -258,6 +311,97 @@ const searchProduct = async (req, res) => {
   }
 };
 
+// Get single prooduct controller
+const getSingleProduct = async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    const productDetails = await productModel.aggregate([
+      {
+        $match: { _id: new mongoose.Types.ObjectId(productId) },
+      },
+      // Get likes information
+      {
+        $lookup: {
+          from: "likes",
+          localField: "_id",
+          foreignField: "productId",
+          pipeline: [{ $match: { isLiked: true } }],
+          as: "likes",
+        },
+      },
+      // Get commetn information
+      {
+        $lookup: {
+          from: "comments",
+          localField: "_id",
+          foreignField: "productId",
+          pipeline: [
+            { $match: { isDeleted: false } },
+            { $project: { userName: 1, comment: 1, createdAt: 1 } },
+          ],
+          as: "comments",
+        },
+      },
+      // Get ratings information
+      {
+        $lookup: {
+          from: "ratings",
+          localField: "_id",
+          foreignField: "productId",
+          pipeline: [
+            { $match: { isDeleted: false } },
+            {
+              $group: {
+                _id: null,
+                averageRating: { $avg: "$rating" },
+                totalRatings: { $sum: 1 },
+              },
+            },
+          ],
+          as: "ratings",
+        },
+      },
+      {
+        $addFields: {
+          totalLikes: { $size: "$likes" },
+          commentsCount: { $size: "$comments" },
+          rating: {
+            average: { $round: [{ $first: "$ratings.averageRating" }, 1] },
+            count: { $first: "$ratings.totalRatings" },
+          },
+        },
+      },
+      {
+        $project: {
+          likes: 0,
+          ratings: 0,
+        },
+      },
+    ]);
+
+    if (!productDetails || productDetails.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: "Product not found",
+      });
+    }
+
+    if (productDetails) {
+      return res.status(200).json({
+        status: 200,
+        message: "Data fetch successfully",
+        data: productDetails[0],
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      messgage: "Internal server error",
+    });
+  }
+};
+
 module.exports = {
   createProduct,
   getProduct,
@@ -266,4 +410,5 @@ module.exports = {
   deleteProduct,
   getcategorySubcategoryProduct,
   searchProduct,
+  getSingleProduct,
 };

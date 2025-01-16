@@ -14,6 +14,7 @@ const ProductController = require("../../controllers/product.controller");
 const LikeController = require("../../controllers/like.controller");
 const CommentController = require("../../controllers/comment.controller");
 const ProductRatingController = require("../../controllers/rating.controller");
+const CartController = require("../../controllers/cart.controller");
 
 // import others
 const {
@@ -66,6 +67,12 @@ router.post(
 // Define product search route
 router.get("/product-search", ProductController.searchProduct);
 
+// get single product route
+router.get(
+  "/get-single-product/:productId",
+  ProductController.getSingleProduct
+);
+
 // ******************************************* Like route ********************************
 // Define create like route
 router.post("/create-like", LikeController.toggleLike);
@@ -99,5 +106,37 @@ router.post("/create-rating", ProductRatingController.createRating);
 
 // Define get user rating route
 router.get("/get-rating", ProductRatingController.getRating);
+
+// Define get single product rating route
+router.get(
+  "/get-rating/:productId",
+  ProductRatingController.getSingleProductRating
+);
+
+// Define update product rating
+router.put(
+  "/update-product-rating/:productId",
+  ProductRatingController.updateProductRating
+);
+
+// Define delete product rating
+router.delete(
+  "/delete-product-rating/:ratingId",
+  ProductRatingController.deleteProductRating
+);
+
+// ***************************************** Cart route *******************************************
+
+// Adding product to cart route
+router.post("/add-to-cart", CartController.addToCart);
+
+// Get cart details route
+router.get("/get-cart-details", CartController.getCartDetails);
+
+// Remove from cart route
+router.delete("/remove-from-cart/:productId", CartController.removeFromCart);
+
+// clear cart route
+router.delete("/clear-cart", CartController.clearCart);
 
 module.exports = router;

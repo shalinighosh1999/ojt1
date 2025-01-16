@@ -42,6 +42,10 @@ const productRating = new Schema(
       trim: true,
       maxLength: 1000,
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
