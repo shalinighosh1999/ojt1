@@ -62,9 +62,14 @@ const addToCart = async (req, res) => {
     }
 
     // Calculate updated totals
-    cart.subTotal = cart.items
-      .reduce((total, item) => parseInt(total + item.price * item.quantity), 0)
-      .toFixed(2);
+    cart.subTotal = Number(
+      cart.items
+        .reduce(
+          (total, item) => parseInt(total + item.price * item.quantity),
+          0
+        )
+        .toFixed(2)
+    );
     cart.totalItems = cart.items.reduce(
       (total, item) => total + item.quantity,
       0
@@ -185,4 +190,80 @@ const clearCart = async (req, res) => {
   }
 };
 
-module.exports = { addToCart, getCartDetails, removeFromCart, clearCart };
+// update cart quantity controller mehtod
+const updateCartQuantity = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { quantity } = req.body;
+    const userId = req.user._id;
+
+    // Input validation
+    if (!quantity || quantity < 1) {
+      return res.status(400).json({
+        status: 400,
+        message: "Invalid quantity value",
+      });
+    }
+
+    // Find the cart for the user
+    const cart = await CartModel.findOne({ userId });
+    if (!cart) {
+      return res.status(404).json({
+        status: 404,
+        message: "Cart not found",
+      });
+    }
+
+    // Find the item index in the cart
+    const itemIndex = cart.items.findIndex(
+      (item) => item.productId.toString() === productId
+    );
+
+    if (itemIndex === -1) {
+      return res.status(404).json({
+        status: 404,
+        message: "Product not found in cart",
+      });
+    }
+
+    // Get the old quantity for calculation
+    const oldQuantity = cart.items[itemIndex].quantity;
+    const itemPrice = cart.items[itemIndex].price;
+
+    // Update item quantity
+    cart.items[itemIndex].quantity = quantity;
+
+    // Recalculate cart totals
+    cart.subTotal = Number(
+      (cart.subTotal - oldQuantity * itemPrice + quantity * itemPrice).toFixed(
+        2
+      )
+    );
+    cart.totalItems = cart.items.reduce(
+      (total, item) => total + item.quantity,
+      0
+    );
+
+    // Save the updated cart
+    await cart.save();
+
+    return res.status(200).json({
+      status: 200,
+      message: "Cart quantity updated successfully",
+      data: cart,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+    });
+  }
+};
+
+module.exports = {
+  addToCart,
+  getCartDetails,
+  removeFromCart,
+  clearCart,
+  updateCartQuantity,
+};

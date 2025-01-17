@@ -69,6 +69,19 @@ const userAuthSchema = new Schema(
         },
       },
     ],
+    isLoggedIn: {
+      type: Boolean,
+      default: false,
+    },
+    status: {
+      type: String,
+      enum: ["login", "logout"],
+      default: "logout",
+    },
+    loginTime: {
+      type: Date,
+      default: Date.now,
+    },
   },
   {
     timestamps: true,

@@ -21,6 +21,10 @@ const likeSchema = new Schema(
       required: [true, "userName is required"],
       trim: true,
     },
+    commentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "comment",
+    },
     isLiked: {
       type: Boolean,
       default: false,

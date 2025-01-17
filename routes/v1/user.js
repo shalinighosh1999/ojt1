@@ -44,6 +44,9 @@ router.post(
 // Define get user profile route
 router.get("/get-profile", userController.getProfile);
 
+// Define user logout route
+router.post("/logout", userController.logout);
+
 // *************************************************** product route *******************************
 
 // Define create product route
@@ -83,6 +86,9 @@ router.get("/like-status/:productId", LikeController.likeStatus);
 // Define user's liked product route
 router.get("/user-like-product", LikeController.getUserLikedProducts);
 
+// Define user can like other comment
+router.post("/like-other-comment/:commentId", LikeController.likeOtherComment);
+
 // ************************************* Comment route ***************************************
 
 // Define create comment route
@@ -98,6 +104,12 @@ router.delete("/delete-comment/:commentId", CommentController.deleteCommnet);
 router.get(
   "/products/:productId/comments",
   CommentController.getProductComment
+);
+
+// Define user can add commnet on other comment
+router.post(
+  "/comments/:commentId/reply",
+  CommentController.commentOnOtherComment
 );
 
 // *********************************** product rating *******************************
@@ -138,5 +150,11 @@ router.delete("/remove-from-cart/:productId", CartController.removeFromCart);
 
 // clear cart route
 router.delete("/clear-cart", CartController.clearCart);
+
+// update item quantity in cart route
+router.put(
+  "/update-cart-quantity/:productId",
+  CartController.updateCartQuantity
+);
 
 module.exports = router;

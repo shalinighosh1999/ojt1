@@ -3,6 +3,7 @@
 // import model
 const LikeModel = require("../Models/like/like.model");
 const ProductModel = require("../Models/product/product.model");
+const CommentModel = require("../Models/comment/comment.model");
 
 // Define create like controller method
 const toggleLike = async (req, res) => {
@@ -107,4 +108,78 @@ const getUserLikedProducts = async (req, res) => {
   }
 };
 
-module.exports = { toggleLike, likeStatus, getUserLikedProducts };
+// Define user can like other user comment
+const likeOtherComment = async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const userId = req.user._id;
+
+    // First check if the comment exists and is not deleted
+    const existingComment = await CommentModel.findOne({
+      _id: commentId,
+      isDeleted: false,
+    });
+    if (!existingComment) {
+      return res.status(404).json({
+        status: 404,
+        message: "Comment not found or has been deleted",
+      });
+    }
+
+    // Check if the user is trying to like their own comment
+    if (existingComment.userId.toString() === userId) {
+      return res.status(404).json({
+        status: 404,
+        message: "Your cannot like your own comment",
+      });
+    }
+
+    // Check if the user has already liked this comment
+    const existingLike = await LikeModel.findOne({
+      userId,
+      productId: existingComment.productId,
+      commentId: existingComment._id,
+    });
+
+    if (existingLike) {
+      existingLike.isLiked = !existingLike.isLiked;
+      await existingLike.save();
+
+      return res.status(200).json({
+        status: 200,
+        message: existingLike.isLiked
+          ? "Comment liked successfully"
+          : "Comment unliked successfully",
+        data: existingLike,
+      });
+    }
+
+    // Create new like
+    const newLike = await LikeModel.create({
+      productId: existingComment.productId,
+      productName: existingComment.productName,
+      userId,
+      userName: req.user.name,
+      commentId: existingComment._id,
+      isLiked: true,
+    });
+
+    return res.status(201).json({
+      status: 201,
+      message: "Comment liked successfully",
+      data: newLike,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+    });
+  }
+};
+
+module.exports = {
+  toggleLike,
+  likeStatus,
+  getUserLikedProducts,
+  likeOtherComment,
+};

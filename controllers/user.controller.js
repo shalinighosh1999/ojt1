@@ -116,11 +116,18 @@ const userLogin = async (req, res) => {
       });
     }
 
-    if (existingUser) {
+    await UserAuthModel.findByIdAndUpdate(existingUser._id, {
+      isLoggedIn: true,
+      status: "login",
+      loginTime: new Date(),
+    });
+    const updatedUser = await UserAuthModel.findById(existingUser._id);
+
+    if (updatedUser) {
       return res.status(200).json({
         status: 200,
         message: "Login successfully",
-        data: existingUser,
+        data: updatedUser,
       });
     }
   } catch (error) {
@@ -216,6 +223,51 @@ const getProfile = async (req, res) => {
   }
 };
 
+// Define user logout controller mehtod
+const logout = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await UserAuthModel.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        status: 404,
+        message: "User not found",
+      });
+    }
+
+    const twoHoursInactivity = new Date(
+      user.updatedAt.getTime() + 5 * 60 * 1000
+      // 2 * 60 * 60 * 1000
+    );
+
+    if (new Date() > twoHoursInactivity) {
+      return res.status(401).json({
+        status: 401,
+        message: "Session expired due to inactivity. Please login again",
+      });
+    }
+
+    const existingUser = await UserAuthModel.findByIdAndUpdate(userId, {
+      isLoggedIn: false,
+      status: "logout",
+    });
+
+    if (existingUser) {
+      return res.status(200).json({
+        status: 200,
+        message: "Logout successfully",
+      });
+    }
+  } catch (error) {
+    console.error("Logout error:", error);
+    return res.status(500).json({
+      status: 500,
+      message: "Internal Server error",
+    });
+  }
+};
+
 module.exports = {
   createToken,
   getTokenData,
@@ -223,4 +275,5 @@ module.exports = {
   userLogin,
   updatePassword,
   getProfile,
+  logout,
 };

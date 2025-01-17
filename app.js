@@ -37,6 +37,10 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use("/", indexRouter);
 app.use("/users", usersRouter);
 
+// initialize auto logout
+const { autoLogoutCheck } = require("./service/autoLogout");
+autoLogoutCheck();
+
 app.use(express.static(path.join(__dirname, "./buildd")));
 app.use(express.static(path.join(__dirname, "public")));
 app.use(function (req, res) {

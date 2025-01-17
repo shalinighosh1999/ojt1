@@ -1,6 +1,9 @@
 // 3rd-party module
 const jwt = require("jsonwebtoken");
 
+// import model
+const UserAuthModel = require("../Models/userAuth.model");
+
 // import controller
 var AdminController = require("../controllers/admin.controller");
 var UserController = require("../controllers/user.controller");
@@ -89,6 +92,13 @@ user.middleware = async (req, res, next) => {
       req.user = userData;
       req.userType = userType;
       req.token = authorization;
+
+      // Update user's last activity time if it's a regular user
+      if (userType === "User") {
+        await UserAuthModel.findByIdAndUpdate(userData._id, {
+          updatedAt: new Date(),
+        });
+      }
 
       return next();
     }

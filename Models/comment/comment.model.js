@@ -4,6 +4,11 @@ const { Schema } = mongoose;
 // Define comment schema
 const commentSchema = new Schema(
   {
+    parentCommentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "comment",
+      default: null, // null means it's a top-level comment
+    },
     productId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "product",

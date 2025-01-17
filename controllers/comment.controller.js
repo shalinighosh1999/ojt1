@@ -12,7 +12,8 @@ const createComment = async (req, res) => {
     const userName = req.user.name;
 
     // get existing product
-    const existingProduct = await ProductModel.find({ _id: productId });
+    const existingProduct = await ProductModel.findOne({ _id: productId });
+    console.log(existingProduct);
 
     // create comment
     const createComment = await CommentModel.create({
@@ -158,9 +159,52 @@ const getProductComment = async (req, res) => {
   }
 };
 
+// Define comment on other comment
+const commentOnOtherComment = async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const userId = req.user._id;
+    const { comment } = req.body;
+
+    // Check if parent comment exists and is not deleted
+    const parentComment = await CommentModel.findOne({
+      _id: commentId,
+      isDeleted: false,
+    });
+    if (!parentComment) {
+      return res.status(404).json({
+        status: 404,
+        message: "Parent comment not found or has been deleted",
+      });
+    }
+
+    // Create new comment
+    const newComment = await CommentModel.create({
+      productId: parentComment.productId,
+      productName: parentComment.productName,
+      userId,
+      userName: req.user.name,
+      comment,
+      parentCommentId: parentComment._id,
+    });
+
+    return res.status(201).json({
+      status: 201,
+      message: "Comment added successfully",
+      data: newComment,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+    });
+  }
+};
+
 module.exports = {
   createComment,
   upateComment,
   deleteCommnet,
   getProductComment,
+  commentOnOtherComment,
 };
