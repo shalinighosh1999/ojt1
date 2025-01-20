@@ -15,6 +15,7 @@ const LikeController = require("../../controllers/like.controller");
 const CommentController = require("../../controllers/comment.controller");
 const ProductRatingController = require("../../controllers/rating.controller");
 const CartController = require("../../controllers/cart.controller");
+const OrderController = require("../../controllers/order.controller");
 
 // import others
 const {
@@ -156,5 +157,28 @@ router.put(
   "/update-cart-quantity/:productId",
   CartController.updateCartQuantity
 );
+
+// ***************************************** Product Order Route *******************************************
+
+// Define create order route
+router.post("/create-order", OrderController.createOrder);
+
+// Define all order for a particular user route
+router.get("/get-all-order", OrderController.getAllOrder);
+
+// Define single order for a particular user route
+router.get("/get-single-order/:orderId", OrderController.getSingleOrder);
+
+// Define update payment status route
+router.patch(
+  "/update-payment-status/:orderId",
+  OrderController.updatePaymentStatus
+);
+
+// Define cancel order route
+router.delete("/delete-order/:orderId", OrderController.deleteOrder);
+
+// Define order tracking route
+router.get("/track-order/:orderId", OrderController.trackingOrder);
 
 module.exports = router;

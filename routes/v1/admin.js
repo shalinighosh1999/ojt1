@@ -9,6 +9,7 @@ var upload = multer({ storage: storage });
 // import controller
 const adminController = require("../../controllers/admin.controller");
 const ProductController = require("../../controllers/product.controller");
+const OrderController = require("../../controllers/order.controller");
 
 // import others
 const {
@@ -107,5 +108,13 @@ router.post("/update-product/:productId", ProductController.updateProduct);
 
 // Define delete product route
 router.post("/delete-product/:productId", ProductController.deleteProduct);
+
+// ***************************************** Product Order Route *******************************************
+
+// Update order status route
+router.patch(
+  "/update-order-status-by-admin/:orderId",
+  OrderController.updateOrderStatusbyAdmin
+);
 
 module.exports = router;

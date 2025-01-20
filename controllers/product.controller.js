@@ -90,7 +90,13 @@ const createProduct = async (req, res) => {
 // Define get product controller method
 const getProduct = async (req, res) => {
   try {
-    // const getProduct = await productModel.find({});
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 5;
+    const skip = (page - 1) * limit;
+
+    const totalProducts = await productModel.countDocuments({});
+    const totalPages = Math.ceil(totalProducts / limit);
+
     const getProduct = await productModel.aggregate([
       {
         $match: {},
@@ -105,7 +111,6 @@ const getProduct = async (req, res) => {
           as: "likes",
         },
       },
-
       // get rating information
       {
         $lookup: {
@@ -140,13 +145,43 @@ const getProduct = async (req, res) => {
           ratings: 0,
         },
       },
+      //pagination
+      { $skip: skip },
+      { $limit: limit },
     ]);
+
+    //products were found after aggregation
+    if (getProduct.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: "No products found",
+        pagination: {
+          currentPage: page,
+          totalPages: totalPages,
+          productsPerPage: limit,
+          totalProducts: totalProducts,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1,
+        },
+        length: 0,
+        data: [],
+      });
+    }
 
     return res.status(200).json({
       status: 200,
       message: "Data fetch successfully",
+
       length: getProduct.length,
       data: getProduct,
+      pagination: {
+        currentPage: page,
+        totalPages: totalPages,
+        productsPerPage: limit,
+        totalProducts: totalProducts,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
     });
   } catch (error) {
     return res.status(500).json({
@@ -180,12 +215,10 @@ const editProduct = async (req, res) => {
 
 // Define update product controller mehtod
 const updateProduct = async (req, res) => {
-  console.log(req);
   try {
     const prouctId = req.params.productId;
 
     const productData = req.body;
-    console.log(productData);
 
     const existingProduct = await productModel.findById(prouctId);
     if (!existingProduct) {
