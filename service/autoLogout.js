@@ -4,7 +4,7 @@ const UserAuthModel = require("../Models/userAuth.model");
 // Auto logout function
 const autoLogoutCheck = async () => {
   try {
-    const twoHoursAgo = new Date(Date.now() - 5 * 60 * 1000); // 2 hours
+    const twoHoursAgo = new Date(Date.now() - 1 * 60 * 1000); // 2 hours
     // 2 * 60 * 60 * 1000
 
     const result = await UserAuthModel.updateMany(

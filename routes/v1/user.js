@@ -32,6 +32,9 @@ router.post(
   userController.userRegistration
 );
 
+// OTP verification route
+router.post("/verify-otp", userController.verifyOtp);
+
 // Define user login route
 router.post("/user-login", loginValidator, userController.userLogin);
 
@@ -47,6 +50,15 @@ router.get("/get-profile", userController.getProfile);
 
 // Define user logout route
 router.post("/logout", userController.logout);
+
+// Add new address of the user route
+router.post("/add-new-address", userController.addNewAddress);
+
+// Get all address of the user route
+router.get("/get-all-address", userController.getAllAddress);
+
+// Get single address of the user by id
+router.get("/get-single-address/:addressId", userController.getSingleAddress);
 
 // *************************************************** product route *******************************
 
@@ -77,7 +89,20 @@ router.get(
   ProductController.getSingleProduct
 );
 
+// Sort product route based on color and price
+router.get("/sort-proudct", ProductController.sortProduct);
+
+// Define filter product based on color brand price and rating
+router.get("/filter-product", ProductController.filterProduct);
+
+// Define fetch product brand route
+router.get("/get-product-brand", ProductController.getProductsBrand);
+
+// Define fetch product color route
+router.get("/get-product-color", ProductController.getProductsColor);
+
 // ******************************************* Like route ********************************
+
 // Define create like route
 router.post("/create-like", LikeController.toggleLike);
 

@@ -5,6 +5,7 @@ const mongoose = require("mongoose");
 const ProductCategoryModel = require("../Models/product/category.model");
 const ProductSubcategoryModel = require("../Models/product/subCategory.model");
 const productModel = require("../Models/product/product.model");
+const ProductRatingModel = require("../Models/rating/product.rating.model");
 
 // Define createProduct controller mehtod
 const createProduct = async (req, res) => {
@@ -18,6 +19,8 @@ const createProduct = async (req, res) => {
       quantity,
       image,
       images,
+      color,
+      brand,
     } = req.body;
 
     const category = await ProductCategoryModel.findOne({
@@ -57,22 +60,12 @@ const createProduct = async (req, res) => {
       quantity,
       image,
       images,
+      color,
+      brand,
       createdBy: req.user._id,
     };
 
     const product = await productModel.create(productData);
-
-    // Populate the category and subcategory information
-    // const populatedProduct = await productModel
-    //   .findById(product._id)
-    //   .populate({
-    //     path: "categoryId",
-    //     select: "name description image",
-    //   })
-    //   .populate({
-    //     path: "subcategoryId",
-    //     select: "subcategoryName description image",
-    //   });
 
     return res.status(201).json({
       status: 201,
@@ -435,6 +428,245 @@ const getSingleProduct = async (req, res) => {
   }
 };
 
+// Define product sort controller mehtod
+const sortProduct = async (req, res) => {
+  try {
+    const {
+      sortBy = "price",
+      order = "asc",
+      colors,
+      minPrice,
+      maxPrice,
+    } = req.query;
+
+    // Validate sort parameters
+    const validSortFields = ["price", "color"];
+    if (!validSortFields.includes(sortBy)) {
+      return res.status(400).json({
+        status: 400,
+        message: "Invalid sort field. Allowed fields: price, color",
+      });
+    }
+
+    const validOrders = ["asc", "desc"];
+    if (!validOrders.includes(order.toLowerCase())) {
+      return res.status(400).json({
+        status: 400,
+        message: "Invalid sort order. Use 'asc' or 'desc'",
+      });
+    }
+
+    // Build query object
+    const query = {};
+
+    // Add color filter if provided
+    if (colors) {
+      const colorArray = colors.split(",").map((color) => color.trim());
+      query.color = { $in: colorArray };
+    }
+
+    // Add price range filter if provided
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = Number(minPrice);
+      if (maxPrice) query.price.$lte = Number(maxPrice);
+    }
+
+    // Build sort object
+    const sortObject = {};
+
+    // Handle color sorting
+    if (sortBy === "color") {
+      sortObject["color.0"] = order === "asc" ? 1 : -1; // Sort by first color in the array
+    } else {
+      sortObject[sortBy] = order === "asc" ? 1 : -1;
+    }
+
+    // Execute query with sorting
+    const products = await productModel
+      .find(query)
+      .sort(sortObject)
+      .select("-__v");
+
+    // Return response
+    return res.status(200).json({
+      status: 200,
+      message: "Products retrieved successfully",
+      total: products.length,
+      data: products,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+    });
+  }
+};
+
+// Define filter product controller method
+const filterProduct = async (req, res) => {
+  try {
+    const { brand, color, minPrice, maxPrice, rating } = req.query;
+
+    let filterQuery = {};
+
+    if (brand) {
+      filterQuery.brand = { $regex: brand, $options: "i" };
+    }
+
+    if (color) {
+      filterQuery.color = { $in: [color] };
+    }
+
+    if (minPrice || maxPrice) {
+      filterQuery.price = {};
+      if (minPrice && !isNaN(Number(minPrice))) {
+        filterQuery.price.$gte = Number(minPrice);
+      }
+      if (maxPrice && !isNaN(Number(maxPrice))) {
+        filterQuery.price.$lte = Number(maxPrice);
+      }
+    }
+
+    let products = await productModel.find(filterQuery);
+
+    if (rating) {
+      const ratingValue = parseFloat(rating);
+      if (!isNaN(ratingValue)) {
+        // Get product IDs
+        const productIds = products.map((product) => product._id);
+
+        // Fetch average ratings for these products
+        const productRatings = await ProductRatingModel.aggregate([
+          {
+            $match: {
+              productId: { $in: productIds },
+              isDeleted: false,
+            },
+          },
+          {
+            $group: {
+              _id: "$productId",
+              averageRating: { $avg: "$rating" },
+            },
+          },
+          {
+            $match: {
+              averageRating: { $gte: ratingValue },
+            },
+          },
+        ]);
+
+        // Get product IDs that meet the rating criteria
+        const filteredProductIds = productRatings.map((item) => item._id);
+
+        // Filter the products array to only include products with matching ratings
+        products = products.filter((product) =>
+          filteredProductIds.some((id) => id.equals(product._id))
+        );
+      }
+    }
+
+    return res.status(200).json({
+      status: 200,
+      message: "Products filtered successfully",
+      totalProducts: products.length,
+      data: products,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+    });
+  }
+};
+
+// Define get product brand controller mehtod
+const getProductsBrand = async (req, res) => {
+  try {
+    // Use distinct to get unique brand values
+    const brands = await productModel.distinct("brand");
+
+    // Filter out any null or empty brand values
+    const filteredBrands = brands.filter((brand) => brand && brand.trim());
+
+    // Check if any brands were found
+    if (filteredBrands.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: "No brands found",
+      });
+    }
+
+    // Return success response with brands
+    if (filteredBrands) {
+      return res.status(200).json({
+        status: 200,
+        message: "Brands retrieved successfully",
+        data: filteredBrands,
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+    });
+  }
+};
+
+// Define get product color controller mehtod
+const getProductsColor = async (req, res) => {
+  try {
+    // Use aggregate to unwind the color array and get unique values
+    const colors = await productModel.aggregate([
+      // Unwind the colors array
+      { $unwind: "$color" },
+
+      {
+        $group: {
+          _id: "$color",
+        },
+      },
+
+      {
+        $match: {
+          _id: { $ne: null, $ne: "" },
+        },
+      },
+
+      {
+        $project: {
+          _id: 0,
+          color: "$_id",
+        },
+      },
+    ]);
+
+    // Extract colors into a simple array
+    const colorArray = colors.map((item) => item.color);
+
+    // Check if any colors were found
+    if (colorArray.length === 0) {
+      return res.status(404).json({
+        status: 404,
+        message: "No colors found",
+      });
+    }
+
+    // Return success response with color array
+    return res.status(200).json({
+      status: 200,
+      message: "Colors retrieved successfully",
+      data: colorArray,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+    });
+  }
+};
+
 module.exports = {
   createProduct,
   getProduct,
@@ -444,4 +676,8 @@ module.exports = {
   getcategorySubcategoryProduct,
   searchProduct,
   getSingleProduct,
+  sortProduct,
+  filterProduct,
+  getProductsBrand,
+  getProductsColor,
 };

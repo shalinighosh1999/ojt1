@@ -31,6 +31,10 @@ const productSchema = new Schema(
     userName: {
       type: String,
     },
+    brand: {
+      type: String,
+      trim: true,
+    },
     description: {
       type: String,
       required: [true, "Product description is required"],
@@ -40,6 +44,11 @@ const productSchema = new Schema(
       type: Number,
       required: [true, "Price is required"],
       min: [0, "Price cannot be negative"],
+    },
+    color: {
+      type: [String],
+      trim: true,
+      default: [],
     },
     quantity: {
       type: Number,

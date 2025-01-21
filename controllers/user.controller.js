@@ -5,6 +5,9 @@ const jwt = require("jsonwebtoken");
 // import model
 const UserAuthModel = require("../Models/userAuth.model");
 
+// Import others
+const generateOtp = require("../service/generateOtp");
+
 // Generate Token
 const createToken = (data) => {
   return jwt.sign(data, process.env.JWT_SECRET_KEY_USER);
@@ -18,15 +21,6 @@ const getTokenData = async (token) => {
 
 // Define user registration controller
 const userRegistration = async (req, res) => {
-  const errors = validationResult(req);
-
-  if (!errors.isEmpty()) {
-    return res.status(400).json({
-      status: 400,
-      message: "Validation Errors",
-      errors: errors.array(),
-    });
-  }
   try {
     const { name, email, mobileNo, password, address } = req.body;
 
@@ -37,6 +31,8 @@ const userRegistration = async (req, res) => {
         message: "Sorry, User already exist with this email",
       });
     }
+
+    const otp = await generateOtp(6);
 
     let userData = {
       name,
@@ -49,6 +45,7 @@ const userRegistration = async (req, res) => {
         street: addrs.street || "N/A",
         zipcode: addrs.zipcode,
       })),
+      otp,
     };
 
     const hashPassword = await UserAuthModel.generateHashPassword(password);
@@ -70,8 +67,7 @@ const userRegistration = async (req, res) => {
     if (result) {
       return res.status(201).json({
         status: 201,
-        message: "Data created successfully",
-        data: result,
+        message: "Please check your mobile for OTP Verrification",
       });
     }
   } catch (error) {
@@ -82,17 +78,67 @@ const userRegistration = async (req, res) => {
   }
 };
 
-// Define user login controller method
-const userLogin = async (req, res) => {
-  const errors = validationResult(req);
+// Verify the OTP
+const verifyOtp = async (req, res) => {
+  try {
+    const { otp } = req.body;
+    const userId = req.user._id;
 
-  if (!errors.isEmpty()) {
-    return res.status(400).json({
-      status: 400,
-      message: "Validation Errors",
-      errors: errors.array(),
+    if (!otp) {
+      return res.status(400).json({
+        status: 400,
+        message: "OTP are required",
+      });
+    }
+
+    const user = await UserAuthModel.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        status: 404,
+        message: "User not found",
+      });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({
+        status: 400,
+        message: "User is already verified",
+      });
+    }
+
+    if (user.otp !== otp) {
+      return res.status(400).json({
+        status: 400,
+        message: "Invalid OTP",
+      });
+    }
+
+    // Update user verification status
+    const updatedUser = await UserAuthModel.findByIdAndUpdate(
+      user._id,
+      {
+        isVerified: true,
+        otp: null,
+      },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      status: 200,
+      message: "OTP verified successfully. You can now login.",
+      data: updatedUser,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      message: error.message,
     });
   }
+};
+
+// Define user login controller method
+const userLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -101,6 +147,14 @@ const userLogin = async (req, res) => {
       return res.status(404).json({
         status: 404,
         message: "Your are not register. Please register yourself",
+      });
+    }
+
+    if (!existingUser.isVerified) {
+      return res.status(400).json({
+        status: 400,
+        message:
+          "You are not verified user. Please verify yourself before login",
       });
     }
 
@@ -237,7 +291,7 @@ const logout = async (req, res) => {
     }
 
     const twoHoursInactivity = new Date(
-      user.updatedAt.getTime() + 5 * 60 * 1000
+      user.updatedAt.getTime() + 1 * 60 * 1000
       // 2 * 60 * 60 * 1000
     );
 
@@ -268,6 +322,101 @@ const logout = async (req, res) => {
   }
 };
 
+// Add new address of the user
+const addNewAddress = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { state, city, street, zipcode } = req.body;
+
+    // Create new address object
+    const newAddress = {
+      state,
+      city,
+      street: street || "N/A",
+      zipcode,
+    };
+
+    const updatedUser = await UserAuthModel.findByIdAndUpdate(
+      userId,
+      {
+        $push: { address: newAddress },
+      },
+      { new: true }
+    );
+
+    //get the new address
+    const addedAddress = updatedUser.address[updatedUser.address.length - 1];
+
+    if (addedAddress) {
+      return res.status(201).json({
+        status: 201,
+        message: "New address added successfully",
+        data: addedAddress,
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+    });
+  }
+};
+
+// Get all address of the user controller method
+const getAllAddress = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const allAddress = await UserAuthModel.findById(userId, { address: 1 });
+
+    if (allAddress) {
+      return res.status(200).json({
+        status: 200,
+        message: "Address fetch successfully",
+        data: allAddress,
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+    });
+  }
+};
+
+// Get single address of the user by id controller method
+const getSingleAddress = async (req, res) => {
+  try {
+    const { addressId } = req.params;
+    const userId = req.user._id;
+
+    const user = await UserAuthModel.findById(userId);
+    const address = user.address.find(
+      (addr) => addr._id.toString() === addressId
+    );
+
+    if (!address) {
+      return res.status(404).json({
+        status: 404,
+        message: "address not found",
+      });
+    }
+
+    if (address) {
+      return res.status(200).json({
+        status: 200,
+        message: "Address fetch successfully",
+        data: address,
+      });
+    }
+  } catch (error) {
+    return res.state(500).json({
+      status: 500,
+      message: "Internal server error",
+    });
+  }
+};
+
 module.exports = {
   createToken,
   getTokenData,
@@ -276,4 +425,8 @@ module.exports = {
   updatePassword,
   getProfile,
   logout,
+  addNewAddress,
+  getAllAddress,
+  getSingleAddress,
+  verifyOtp,
 };
