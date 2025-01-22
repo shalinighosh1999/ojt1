@@ -60,6 +60,30 @@ router.get("/get-all-address", userController.getAllAddress);
 // Get single address of the user by id
 router.get("/get-single-address/:addressId", userController.getSingleAddress);
 
+// Define forgot password route
+router.post("/forgot-password", userController.forgotPassword);
+
+// Define forgot password confirmation route
+router.get(
+  "/password-confirmation/:email/:token",
+  userController.passwordConfirmation
+);
+
+// Define reset password route
+router.post("/reset-password", userController.resetPassword);
+
+// Define forgot password with OTP route
+router.post("/forgot-password-otp", userController.forgotPasswordWithOtp);
+
+// Define forgot password with otp confirmation route
+router.post(
+  "/verify-forgot-password-otp",
+  userController.verifyForgotPasswordOtp
+);
+
+// Recall user password
+router.post("/forgot-password-with-recall", userController.recallPassowrd);
+
 // *************************************************** product route *******************************
 
 // Define create product route

@@ -1,3 +1,7 @@
+// Import model
+const EmailTokenModel = require("../Models/emailToken.model");
+const crypto = require("crypto");
+
 async function generateOtp(length = 4) {
   // Ensure the length is a positive integer
   length = Math.abs(Math.floor(length));
@@ -10,4 +14,18 @@ async function generateOtp(length = 4) {
   return otp.toString().padStart(length, "0");
 }
 
-module.exports = generateOtp;
+// Create forgot password email token
+async function createEmailToken(userId) {
+  try {
+    const token = new EmailTokenModel({
+      _userId: userId,
+      token: crypto.randomBytes(16).toString("hex"),
+    });
+    const createToken = await EmailTokenModel.create(token);
+
+    return createToken;
+  } catch (error) {
+    throw new Error("Failed to generate new token");
+  }
+}
+module.exports = { generateOtp, createEmailToken };

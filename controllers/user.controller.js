@@ -4,9 +4,16 @@ const jwt = require("jsonwebtoken");
 
 // import model
 const UserAuthModel = require("../Models/userAuth.model");
+const EmailTokenModel = require("../Models/emailToken.model");
 
 // Import others
-const generateOtp = require("../service/generateOtp");
+const { generateOtp, createEmailToken } = require("../service/generateOtp");
+const {
+  transport,
+  forgotPasswordVerificationEmail,
+  forgotPasswordVerificationEmailWithOtp,
+  recallUserPassword,
+} = require("../helper/mailer");
 
 // Generate Token
 const createToken = (data) => {
@@ -127,7 +134,6 @@ const verifyOtp = async (req, res) => {
     return res.status(200).json({
       status: 200,
       message: "OTP verified successfully. You can now login.",
-      data: updatedUser,
     });
   } catch (error) {
     return res.status(500).json({
@@ -417,6 +423,239 @@ const getSingleAddress = async (req, res) => {
   }
 };
 
+// Define forgot password controller mehtod
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const existingUser = await UserAuthModel.findOne({ email });
+
+    const generateTokenForForgotPassword = await createEmailToken(
+      existingUser._id
+    );
+
+    // Set up email transport
+    const senderEmail = process.env.SENDER_EMAIL;
+    const emailPassword = process.env.EMAIL_PASSWORD;
+
+    const transporter = transport(senderEmail, emailPassword);
+
+    const emailResponse = await forgotPasswordVerificationEmail(
+      req,
+      res,
+      existingUser,
+      transporter,
+      generateTokenForForgotPassword
+    );
+
+    if (emailResponse.status) {
+      res.status(200).json({
+        status: 200,
+        message:
+          "Forgot password verification link has been sent to your registered email address. Please check and verify within 5 minutes",
+      });
+    } else {
+      res
+        .status(500)
+        .json({ message: "Failed to send reset password verification link" });
+    }
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+    });
+  }
+};
+
+// Define password confirmation controller method
+const passwordConfirmation = async (req, res) => {
+  try {
+    const { email, token } = req.params;
+
+    // Find the token in the database using the provided token from the URL
+    const verifiedToken = await EmailTokenModel.findOne({ token });
+
+    if (!verifiedToken) {
+      return res
+        .status(400)
+        .json({ message: "Verification link may have expired." });
+    }
+
+    // Find the user associated with the token and the provided email
+    const existingUser = await UserAuthModel.findOne({
+      _id: verifiedToken._userId,
+      email,
+    });
+
+    if (!existingUser) {
+      res.status(400).json({ message: "Please Register Yourself" });
+    } else {
+      // Delete Token Automatically after user Verification
+      await EmailTokenModel.deleteOne({ _id: verifiedToken._id });
+
+      return res
+        .status(200)
+        .json({ status: 200, message: "User Verified Successfully" });
+    }
+  } catch (error) {
+    res.status(500).json({
+      status: 500,
+      message: error.message,
+    });
+  }
+};
+
+// Define reset password controller method
+const resetPassword = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { newPassword } = req.body;
+
+    const existingUser = await UserAuthModel.findOne({ _id: userId });
+
+    if (!existingUser) {
+      return res.status(400).json({
+        status: 400,
+        message: "Wrong email",
+      });
+    }
+
+    // 5. If email are correct, then hash the new password which is present in incoming request body
+    const hashPassword = await UserAuthModel.generateHashPassword(newPassword);
+
+    await UserAuthModel.findByIdAndUpdate(existingUser._id, {
+      password: newPassword,
+      hashedPassword: hashPassword,
+    });
+
+    return res.status(200).json({
+      status: 200,
+      message: "Password Reset Successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 500,
+      message: error.message,
+    });
+  }
+};
+
+// Define forgot password with OTP -->  Not required Email token model, because OTP will set user's document
+const forgotPasswordWithOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const existingUser = await UserAuthModel.findOne({ email });
+
+    // Generate OTP
+    const otp = await generateOtp(6);
+
+    existingUser.otp = otp;
+    await existingUser.save();
+
+    // Set up email transport
+    const senderEmail = process.env.SENDER_EMAIL;
+    const emailPassword = process.env.EMAIL_PASSWORD;
+
+    const transporter = transport(senderEmail, emailPassword);
+
+    const emailResponse = await forgotPasswordVerificationEmailWithOtp(
+      req,
+      res,
+      existingUser,
+      transporter,
+      otp
+    );
+
+    if (emailResponse.status) {
+      res.status(200).json({
+        status: 200,
+        message:
+          "Forgot password verification link has been sent to your registered email address. Please check and verify within 5 minutes",
+      });
+    } else {
+      res
+        .status(500)
+        .json({ message: "Failed to send reset password verification link" });
+    }
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+    });
+  }
+};
+
+// Defne forgot password otp verification
+const verifyForgotPasswordOtp = async (req, res) => {
+  try {
+    const { otp } = req.body;
+    const userId = req.user._id;
+
+    const existingUser = await UserAuthModel.findOne({ _id: userId });
+
+    if (existingUser.otp !== otp) {
+      return res.status(404).json({
+        status: 404,
+        message: "Invalid OTP",
+      });
+    }
+
+    existingUser.otp = null;
+    await existingUser.save();
+
+    return res.status(200).json({
+      status: 200,
+      message: "OTP verified successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+    });
+  }
+};
+
+// Define recall password controller method
+const recallPassowrd = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const existingUser = await UserAuthModel.findOne({ email });
+
+    // Set up email transport
+    const senderEmail = process.env.SENDER_EMAIL;
+    const emailPassword = process.env.EMAIL_PASSWORD;
+
+    const transporter = transport(senderEmail, emailPassword);
+
+    const emailResponse = await recallUserPassword(
+      req,
+      res,
+      existingUser,
+      transporter
+    );
+
+    if (emailResponse.status) {
+      res.status(200).json({
+        status: 200,
+        message: "Password has been sent to your register email",
+      });
+    } else {
+      res
+        .status(500)
+        .json({ message: "Failed to send reset password verification link" });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+    });
+  }
+};
+
 module.exports = {
   createToken,
   getTokenData,
@@ -429,4 +668,10 @@ module.exports = {
   getAllAddress,
   getSingleAddress,
   verifyOtp,
+  forgotPassword,
+  passwordConfirmation,
+  resetPassword,
+  forgotPasswordWithOtp,
+  verifyForgotPasswordOtp,
+  recallPassowrd,
 };

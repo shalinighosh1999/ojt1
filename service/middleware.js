@@ -27,6 +27,15 @@ const permission = [
   {
     url: "/user/user-login",
   },
+  {
+    url: "/user/forgot-password",
+  },
+  {
+    url: "/user/forgot-password-otp",
+  },
+  {
+    url: "/user/forgot-password-with-recall",
+  },
 ];
 
 // JWT secret keys for different roles
